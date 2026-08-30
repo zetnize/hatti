@@ -10,6 +10,7 @@ export type Product = {
   code: string;
   description: string;
   sizes?: string[];
+  models?: string[];
 };
 
 export const categories = ["Все", "Футболки", "Обложки", "Чехлы", "Кепки"] as const;
@@ -30,8 +31,8 @@ export const products: Product[] = [
   { id: 13, slug: "circassia-cover-green", name: "Circassia / Green", category: "Обложки", color: "Зелёный", image: "/products/13_cover_circassia_green.png", code: "OBJECT 13 / ARCHIVE", description: "Обложка с горной маркой и фактурой старой почтовой миниатюры." },
   { id: 14, slug: "circassia-cover-burgundy", name: "Circassia / Burgundy", category: "Обложки", color: "Винный", image: "/products/14_cover_circassia_burgundy.png", code: "OBJECT 14 / ARCHIVE", description: "Винная версия обложки из серии Circassia." },
   { id: 15, slug: "circassia-cover-cream", name: "Circassia / Cream", category: "Обложки", color: "Кремовый", image: "/products/15_cover_circassia_cream.png", code: "OBJECT 15 / ARCHIVE", description: "Светлая версия обложки с графикой горного хребта." },
-  { id: 16, slug: "topographic-case", name: "Topographic Case", category: "Чехлы", color: "Чёрный", image: "/products/16_iphone15pro_topographic_case.png", code: "OBJECT 16 / TERRAIN", description: "Чехол для iPhone 15 Pro с топографической графикой." },
-  { id: 17, slug: "freedom-case", name: "Freedom Case", category: "Чехлы", color: "Чёрный", image: "/products/17_iphone15pro_freedom_case.png", code: "OBJECT 17 / FREEDOM", description: "Чехол для iPhone 15 Pro с типографикой Freedom." },
+  { id: 16, slug: "topographic-case", name: "Topographic Case", category: "Чехлы", color: "Чёрный", image: "/products/16_iphone15pro_topographic_case.png", code: "OBJECT 16 / TERRAIN", description: "Чехол для iPhone 15 Pro с топографической графикой.", models: ["iPhone 13", "iPhone 14", "iPhone 15", "iPhone 15 Pro"] },
+  { id: 17, slug: "freedom-case", name: "Freedom Case", category: "Чехлы", color: "Чёрный", image: "/products/17_iphone15pro_freedom_case.png", code: "OBJECT 17 / FREEDOM", description: "Чехол для iPhone 15 Pro с типографикой Freedom.", models: ["iPhone 13", "iPhone 14", "iPhone 15", "iPhone 15 Pro"] },
   { id: 18, slug: "freedom-or-death-cap", name: "Freedom or Death", category: "Кепки", color: "Чёрный", image: "/products/18_cap_freedom_or_death.png", code: "OBJECT 18 / FREEDOM", description: "Чёрная кепка с объёмной контрастной вышивкой." },
   { id: 19, slug: "mcga-cap", name: "Make Circassia Great Again", category: "Кепки", color: "Чёрный", image: "/products/19_cap_make_circassia_great_again.png", code: "OBJECT 19 / MCGA", description: "Ироничный манифест HATTI в формате вышитой кепки." },
   { id: 20, slug: "circassian-vibe-cap", name: "Circassian Vibe", category: "Кепки", color: "Чёрный", image: "/products/20_cap_circassian_vibe.png", code: "OBJECT 20 / VIBE", description: "Повседневная кепка с фирменной надписью Circassian Vibe." }

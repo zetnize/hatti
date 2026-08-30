@@ -96,6 +96,10 @@ function IndexLabel({ children, inverse = false }: { children: React.ReactNode; 
   return <span className={`index-label${inverse ? " index-label--inverse" : ""}`}>{children}</span>;
 }
 
+function getProductOptions(product: Product) {
+  return product.sizes ?? product.models ?? [];
+}
+
 export function HattiStore() {
   const reduceMotion = useReducedMotion();
   const { scrollYProgress } = useScroll();
@@ -103,6 +107,7 @@ export function HattiStore() {
   const heroTypeY = useTransform(scrollYProgress, [0, 0.2], [0, reduceMotion ? 0 : -60]);
   const [filter, setFilter] = useState<Filter>("Все");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
   const [selectedSize, setSelectedSize] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -128,11 +133,12 @@ export function HattiStore() {
   }, [cart, cartReady]);
 
   useEffect(() => {
-    const overlayOpen = Boolean(selectedProduct || cartOpen || menuOpen || legalOpen);
+    const overlayOpen = Boolean(selectedProduct || quickAddProduct || cartOpen || menuOpen || legalOpen);
     document.body.style.overflow = overlayOpen ? "hidden" : "";
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSelectedProduct(null);
+        setQuickAddProduct(null);
         setCartOpen(false);
         setMenuOpen(false);
         setLegalOpen(null);
@@ -143,7 +149,7 @@ export function HattiStore() {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", onKey);
     };
-  }, [selectedProduct, cartOpen, menuOpen, legalOpen]);
+  }, [selectedProduct, quickAddProduct, cartOpen, menuOpen, legalOpen]);
 
   const filteredProducts = useMemo(
     () => (filter === "Все" ? products : products.filter((product) => product.category === filter)),
@@ -154,7 +160,17 @@ export function HattiStore() {
 
   const openProduct = (product: Product) => {
     setSelectedProduct(product);
-    setSelectedSize(product.sizes?.[1] ?? "One size");
+    setSelectedSize(product.sizes?.[1] ?? product.models?.[0] ?? "One size");
+  };
+
+  const openQuickAdd = (product: Product) => {
+    const options = getProductOptions(product);
+    if (options.length === 0) {
+      addToCart(product, "One size");
+      return;
+    }
+    setSelectedSize(product.sizes?.[1] ?? options[0]);
+    setQuickAddProduct(product);
   };
 
   const addToCart = (product: Product, size: string) => {
@@ -168,6 +184,7 @@ export function HattiStore() {
       return [...current, { productId: product.id, size, quantity: 1 }];
     });
     setSelectedProduct(null);
+    setQuickAddProduct(null);
     setCartOpen(true);
   };
 
@@ -225,7 +242,6 @@ export function HattiStore() {
               <IndexLabel inverse>HATTI / DROP 01 / 43°32′17″ N</IndexLabel>
               <h1 id="hero-title">
                 <span>Circassia</span>
-                <span className="hero-slash">/</span>
                 <span>Present tense</span>
               </h1>
               <div className="hero-dagger">
@@ -320,6 +336,9 @@ export function HattiStore() {
                         <span className="product-category">{product.category}</span>
                       </span>
                     </button>
+                    <button className="product-quick-add" onClick={() => openQuickAdd(product)} aria-label={`Добавить ${product.name} в корзину`}>
+                      <ShoppingBasket size={18} strokeWidth={1.6} />
+                    </button>
                   </motion.article>
                 ))}
               </AnimatePresence>
@@ -411,6 +430,42 @@ export function HattiStore() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {quickAddProduct && (
+          <motion.div className="quick-add-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setQuickAddProduct(null)}>
+            <motion.div
+              className="quick-add-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quick-add-title"
+              initial={{ y: 28, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 18, opacity: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <button className="quick-add-close" onClick={() => setQuickAddProduct(null)} aria-label="Закрыть выбор варианта"><X /></button>
+              <div className="quick-add-image"><Image src={quickAddProduct.image} alt="" fill sizes="180px" /></div>
+              <div className="quick-add-content">
+                <IndexLabel>{quickAddProduct.code}</IndexLabel>
+                <h2 id="quick-add-title">{quickAddProduct.name}</h2>
+                <fieldset className={`quick-options${quickAddProduct.models ? " quick-options--models" : ""}`}>
+                  <legend>{quickAddProduct.models ? "Выберите модель" : "Выберите размер"}</legend>
+                  <div>
+                    {getProductOptions(quickAddProduct).map((option) => (
+                      <button key={option} className={selectedSize === option ? "is-selected" : ""} onClick={() => setSelectedSize(option)}>{option}</button>
+                    ))}
+                  </div>
+                </fieldset>
+                <button className="quick-add-confirm" onClick={() => addToCart(quickAddProduct, selectedSize)}>
+                  Добавить в корзину <ShoppingBasket size={18} />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {selectedProduct && (
           <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setSelectedProduct(null)}>
             <motion.div
@@ -437,12 +492,12 @@ export function HattiStore() {
                   <div><dt>Цвет</dt><dd>{selectedProduct.color}</dd></div>
                   <div><dt>Цена</dt><dd>По запросу</dd></div>
                 </dl>
-                {selectedProduct.sizes && (
-                  <fieldset className="size-picker">
-                    <legend>Выберите размер</legend>
+                {getProductOptions(selectedProduct).length > 0 && (
+                  <fieldset className={`size-picker${selectedProduct.models ? " size-picker--models" : ""}`}>
+                    <legend>{selectedProduct.models ? "Выберите модель" : "Выберите размер"}</legend>
                     <div>
-                      {selectedProduct.sizes.map((size) => (
-                        <button key={size} className={selectedSize === size ? "is-selected" : ""} onClick={() => setSelectedSize(size)}>{size}</button>
+                      {getProductOptions(selectedProduct).map((option) => (
+                        <button key={option} className={selectedSize === option ? "is-selected" : ""} onClick={() => setSelectedSize(option)}>{option}</button>
                       ))}
                     </div>
                   </fieldset>
