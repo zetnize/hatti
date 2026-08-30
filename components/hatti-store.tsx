@@ -245,11 +245,14 @@ export function HattiStore() {
                 <span>Present tense</span>
               </h1>
               <div className="hero-dagger">
-                <Image
-                  src="/brand/hatti-dagger.png"
-                  alt="Орнаментированный черкесский кинжал"
-                  fill
-                  sizes="(max-width: 800px) 92vw, 52vw"
+                <video
+                  src="/brand/hatti-dagger.mp4"
+                  poster="/brand/hatti-dagger.png"
+                  autoPlay
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-label="Орнаментированный черкесский кинжал"
                 />
               </div>
               <p className="hero-intro">Национальная идентичность — не прошлое. Она живёт сейчас.</p>

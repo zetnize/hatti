@@ -226,7 +226,10 @@ a:focus-visible {
   background: #111313;
 }
 
-.hero-dagger img {
+.hero-dagger video {
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   object-position: center;
   filter: contrast(1.18);
