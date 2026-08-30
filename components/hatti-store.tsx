@@ -1,13 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import Lenis from "lenis";
 import {
   AnimatePresence,
   MotionConfig,
   motion,
-  useReducedMotion,
-  useScroll,
-  useTransform,
 } from "framer-motion";
 import {
   ArrowDown,
@@ -19,6 +17,7 @@ import {
   Plus,
   ShoppingBag,
   ShoppingBasket,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -101,10 +100,6 @@ function getProductOptions(product: Product) {
 }
 
 export function HattiStore() {
-  const reduceMotion = useReducedMotion();
-  const { scrollYProgress } = useScroll();
-  const heroImageY = useTransform(scrollYProgress, [0, 0.22], [0, reduceMotion ? 0 : 90]);
-  const heroTypeY = useTransform(scrollYProgress, [0, 0.2], [0, reduceMotion ? 0 : -60]);
   const [filter, setFilter] = useState<Filter>("Все");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
@@ -115,6 +110,21 @@ export function HattiStore() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartReady, setCartReady] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const lenis = new Lenis({
+      autoRaf: true,
+      autoToggle: true,
+      anchors: true,
+      lerp: 0.09,
+      smoothWheel: true,
+      wheelMultiplier: 0.9,
+      stopInertiaOnNavigate: true,
+      respectReducedMotion: true,
+    });
+
+    return () => lenis.destroy();
+  }, []);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("hatti-cart");
@@ -200,6 +210,14 @@ export function HattiStore() {
     );
   };
 
+  const removeFromCart = (item: CartItem) => {
+    setCart((current) =>
+      current.filter(
+        (entry) => entry.productId !== item.productId || entry.size !== item.size,
+      ),
+    );
+  };
+
   const copyOrder = async () => {
     const lines = cart.map((item) => {
       const product = products.find((entry) => entry.id === item.productId);
@@ -238,7 +256,7 @@ export function HattiStore() {
 
         <main>
           <section className="hero" aria-labelledby="hero-title">
-            <motion.div className="hero-type" style={{ y: heroTypeY }}>
+            <div className="hero-type">
               <IndexLabel inverse>HATTI / DROP 01 / 43°32′17″ N</IndexLabel>
               <h1 id="hero-title">
                 <span>Circassia</span>
@@ -259,9 +277,9 @@ export function HattiStore() {
               <a className="hero-cta hero-cta--desktop" href="#collection">
                 Смотреть коллекцию <ArrowDown size={18} />
               </a>
-            </motion.div>
+            </div>
 
-            <motion.div className="hero-visual" style={{ y: heroImageY }}>
+            <div className="hero-visual">
               <div className="hero-frame-wrap">
                 <div className="hero-image-frame">
                   <Image
@@ -278,7 +296,7 @@ export function HattiStore() {
                 <span>HATTI / Emblem</span>
                 <span>12 stars / 3 arrows</span>
               </div>
-            </motion.div>
+            </div>
 
             <a className="hero-cta hero-cta--mobile" href="#collection">
               Смотреть коллекцию <ArrowDown size={18} />
@@ -378,6 +396,7 @@ export function HattiStore() {
           <motion.div className="legal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setLegalOpen(null)}>
             <motion.article
               className="legal-modal"
+              data-lenis-prevent
               role="dialog"
               aria-modal="true"
               aria-labelledby="legal-modal-title"
@@ -473,6 +492,7 @@ export function HattiStore() {
           <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={() => setSelectedProduct(null)}>
             <motion.div
               className="product-modal"
+              data-lenis-prevent
               role="dialog"
               aria-modal="true"
               aria-labelledby="product-modal-title"
@@ -523,7 +543,7 @@ export function HattiStore() {
                 <div><IndexLabel>Selected objects</IndexLabel><h2>Заявка / {String(cartCount).padStart(2, "0")}</h2></div>
                 <button onClick={() => setCartOpen(false)} aria-label="Закрыть корзину"><X /></button>
               </div>
-              <div className="cart-items">
+              <div className="cart-items" data-lenis-prevent>
                 {cart.length === 0 ? (
                   <div className="empty-cart">
                     <ShoppingBag size={32} strokeWidth={1.2} />
@@ -546,6 +566,13 @@ export function HattiStore() {
                             <button onClick={() => updateQuantity(item, 1)} aria-label="Увеличить количество"><Plus size={14} /></button>
                           </div>
                         </div>
+                        <button
+                          className="cart-remove"
+                          onClick={() => removeFromCart(item)}
+                          aria-label={`Удалить ${product.name} из корзины`}
+                        >
+                          <Trash2 size={16} strokeWidth={1.5} />
+                        </button>
                       </div>
                     );
                   })
