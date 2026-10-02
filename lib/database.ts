@@ -37,7 +37,24 @@ CREATE TABLE IF NOT EXISTS hatti_media (
   content_type text NOT NULL CHECK (content_type IN ('image/png', 'image/jpeg', 'image/webp')),
   bytes bytea NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
-);`;
+);
+CREATE TABLE IF NOT EXISTS hatti_catalog_meta (
+  key text PRIMARY KEY,
+  value text NOT NULL
+);
+ALTER TABLE hatti_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hatti_media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hatti_catalog_meta ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON hatti_products, hatti_media, hatti_catalog_meta FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON hatti_products, hatti_media, hatti_catalog_meta FROM authenticated;
+  END IF;
+END
+$$;`;
 
 let pool: Pool | undefined;
 let schemaReady: Promise<void> | undefined;
@@ -89,16 +106,20 @@ async function initializeSchema() {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(1179804017)");
     await client.query(schemaSql);
-    const count = await client.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM hatti_products");
-    if (count.rows[0].count === "0") {
-      for (const product of initialProducts) {
-        await client.query(
-          `INSERT INTO hatti_products (id, slug, name, category, color, image, code, description, sizes, models)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [product.id, product.slug, product.name, product.category, product.color, product.image, product.code, product.description, product.sizes ?? null, product.models ?? null],
-        );
+    const seeded = await client.query("SELECT 1 FROM hatti_catalog_meta WHERE key = 'initial_seed'");
+    if (!seeded.rowCount) {
+      const count = await client.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM hatti_products");
+      if (count.rows[0].count === "0") {
+        for (const product of initialProducts) {
+          await client.query(
+            `INSERT INTO hatti_products (id, slug, name, category, color, image, code, description, sizes, models)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [product.id, product.slug, product.name, product.category, product.color, product.image, product.code, product.description, product.sizes ?? null, product.models ?? null],
+          );
+        }
+        await client.query("SELECT setval(pg_get_serial_sequence('hatti_products', 'id'), (SELECT MAX(id) FROM hatti_products), true)");
       }
-      await client.query("SELECT setval(pg_get_serial_sequence('hatti_products', 'id'), (SELECT MAX(id) FROM hatti_products), true)");
+      await client.query("INSERT INTO hatti_catalog_meta (key, value) VALUES ('initial_seed', 'done')");
     }
     await client.query("COMMIT");
   } catch (error) {
@@ -134,6 +155,11 @@ export async function databaseSaveProduct(id: number, input: Omit<Product, "id" 
   );
   if (!result.rows[0]) throw new CatalogInputError("Товар не найден.");
   return toProduct(result.rows[0]);
+}
+
+export async function databaseDeleteProduct(id: number) {
+  const result = await (await database()).query("DELETE FROM hatti_products WHERE id=$1 RETURNING id", [id]);
+  if (!result.rowCount) throw new CatalogInputError("Товар не найден.");
 }
 
 export async function databaseCreateProduct(input: Omit<Product, "id" | "slug">) {

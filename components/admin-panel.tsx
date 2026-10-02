@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Check, ImagePlus, LogOut, Plus, Save } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check, ImagePlus, LogOut, Plus, Save, Trash2 } from "lucide-react";
 import { categories, type Product, type ProductCategory } from "@/data/products";
 
 type Draft = {
@@ -148,6 +148,30 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
     }
   }
 
+  async function removeProduct() {
+    if (selectedId === null || busy) return;
+    const product = products.find((item) => item.id === selectedId);
+    if (!product || !window.confirm(`Удалить товар «${product.name}»? Это действие нельзя отменить.`)) return;
+    setBusy(true);
+    setError("");
+    setSaved(false);
+    try {
+      const response = await fetch(`/api/admin/products/${selectedId}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось удалить товар.");
+      const remaining = products.filter((item) => item.id !== selectedId);
+      const next = remaining[0];
+      setProducts(remaining);
+      setSelectedId(next?.id ?? null);
+      setDraft(next ? draftFromProduct(next) : blankDraft);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось удалить товар.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!authenticated) {
     return (
       <main className="admin-root admin-login-page">
@@ -179,6 +203,7 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
         <aside className="admin-list" aria-label="Список товаров">
           <div className="admin-list-head"><span>КОЛЛЕКЦИЯ</span><button onClick={newProduct}><Plus size={16} /> Добавить</button></div>
           <div className="admin-list-items">
+            {products.length === 0 && <p className="admin-empty-list">Товаров пока нет. Добавьте первый объект.</p>}
             {products.map((product) => (
               <button key={product.id} className={`admin-list-item${selectedId === product.id ? " is-selected" : ""}`} onClick={() => selectProduct(product)} aria-current={selectedId === product.id ? "true" : undefined}>
                 <span className="admin-list-thumb"><Image src={product.image} alt="" fill sizes="56px" /></span>
@@ -203,7 +228,10 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
               <label className="admin-field-wide">{draft.category === "Чехлы" ? "Модели" : "Размеры или варианты"}<input value={draft.options} onChange={(event) => setField("options", event.target.value)} placeholder={draft.category === "Чехлы" ? "iPhone 15, iPhone 15 Pro" : "S, M, L, XL"} /><small>Разделяйте варианты запятыми. Можно оставить пустым.</small></label>
             </div>
             {error && <p className="admin-error" role="alert">{error}</p>}
-            <div className="admin-form-actions"><button className="admin-primary-button" type="submit" disabled={busy || uploading}><Save size={17} /> {busy ? "Сохраняем…" : "Сохранить товар"}</button></div>
+            <div className="admin-form-actions">
+              {selectedId !== null && <button className="admin-delete-button" type="button" disabled={busy || uploading} onClick={removeProduct}><Trash2 size={16} /> Удалить товар</button>}
+              <button className="admin-primary-button" type="submit" disabled={busy || uploading}><Save size={17} /> {busy ? "Сохраняем…" : "Сохранить товар"}</button>
+            </div>
           </form>
         </section>
       </div>

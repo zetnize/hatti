@@ -20,3 +20,23 @@ CREATE TABLE IF NOT EXISTS hatti_media (
   bytes bytea NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS hatti_catalog_meta (
+  key text PRIMARY KEY,
+  value text NOT NULL
+);
+
+ALTER TABLE hatti_products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hatti_media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hatti_catalog_meta ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON hatti_products, hatti_media, hatti_catalog_meta FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON hatti_products, hatti_media, hatti_catalog_meta FROM authenticated;
+  END IF;
+END
+$$;

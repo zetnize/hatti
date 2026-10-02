@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { categories, products as initialProducts, type Product, type ProductCategory } from "@/data/products";
-import { databaseConfigured, databaseCreateProduct, databaseProducts, databaseSaveProduct } from "@/lib/database";
+import { databaseConfigured, databaseCreateProduct, databaseDeleteProduct, databaseProducts, databaseSaveProduct } from "@/lib/database";
 import { CatalogInputError } from "@/lib/catalog-errors";
 
 const catalogDirectory = path.join(process.cwd(), ".data");
@@ -62,6 +62,15 @@ export async function createProduct(input: ProductInput) {
     return [...products, created];
   });
   return created;
+}
+
+export async function deleteProduct(id: number) {
+  if (databaseConfigured()) return databaseDeleteProduct(id);
+  if (process.env.NODE_ENV === "production") throw new Error("DATABASE_URL is required in production.");
+  await changeProducts((products) => {
+    if (!products.some((product) => product.id === id)) throw new CatalogInputError("Товар не найден.");
+    return products.filter((product) => product.id !== id);
+  });
 }
 
 function requiredText(value: unknown, label: string, maxLength: number) {
