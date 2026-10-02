@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { categories, products, type Product } from "@/data/products";
+import { categories, type Product } from "@/data/products";
 
 type Filter = (typeof categories)[number];
 type CartItem = { productId: number; size: string; quantity: number };
@@ -99,7 +99,7 @@ function getProductOptions(product: Product) {
   return product.sizes ?? product.models ?? [];
 }
 
-export function HattiStore() {
+export function HattiStore({ products }: { products: Product[] }) {
   const [filter, setFilter] = useState<Filter>("Все");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
@@ -257,7 +257,7 @@ export function HattiStore() {
         <main>
           <section className="hero" aria-labelledby="hero-title">
             <div className="hero-type">
-              <IndexLabel inverse>HATTI / DROP 01 / 43°32′17″ N</IndexLabel>
+              <IndexLabel inverse>HATTI / DROP 01 / 45.03.82</IndexLabel>
               <h1 id="hero-title">
                 <span>Circassia</span>
                 <span>Present tense</span>
@@ -273,7 +273,7 @@ export function HattiStore() {
                   aria-label="Орнаментированный черкесский кинжал"
                 />
               </div>
-              <p className="hero-intro">Национальная идентичность — не прошлое. Она живёт сейчас.</p>
+              <p className="hero-intro">Национальная идентичность: твоя опора в мире глобализации.</p>
               <a className="hero-cta hero-cta--desktop" href="#collection">
                 Смотреть коллекцию <ArrowDown size={18} />
               </a>
@@ -283,14 +283,14 @@ export function HattiStore() {
               <div className="hero-frame-wrap">
                 <div className="hero-image-frame">
                   <Image
-                    src="/brand/hatti-emblem.png"
+                    src="/brand/hatti-emblem-12-stars.png"
                     alt="Белый черкесский символ со звёздами и стрелами на чёрном фоне"
                     fill
                     priority
                     sizes="(max-width: 800px) 92vw, 48vw"
                   />
                 </div>
-                <span className="frame-coordinate">43°32′17″ N / 42°29′20″ E</span>
+                <span className="frame-coordinate">45.03.82 / 38.89.45</span>
               </div>
               <div className="hero-object-note">
                 <span>HATTI / Emblem</span>
@@ -310,7 +310,7 @@ export function HattiStore() {
           <section className="collection" id="collection" aria-labelledby="collection-title">
             <div className="section-heading">
               <div>
-                <IndexLabel>Current drop / 20 objects</IndexLabel>
+                <IndexLabel>Current drop / {products.length} objects</IndexLabel>
                 <h2 id="collection-title">Коллекция</h2>
               </div>
               <p>Выберите изделие и отправьте собранный заказ напрямую бренду.</p>
@@ -552,7 +552,8 @@ export function HattiStore() {
                   </div>
                 ) : (
                   cart.map((item) => {
-                    const product = products.find((entry) => entry.id === item.productId)!;
+                    const product = products.find((entry) => entry.id === item.productId);
+                    if (!product) return null;
                     return (
                       <div className="cart-item" key={`${item.productId}-${item.size}`}>
                         <div className="cart-item-image"><Image src={product.image} alt="" fill sizes="96px" /></div>

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   keywords: ["HATTI", "черкесская одежда", "Circassia", "streetwear"],
   openGraph: {
     title: "HATTI — Circassia / Present Tense",
-    description: "Национальная идентичность — не прошлое. Она живёт сейчас.",
+    description: "Национальная идентичность: твоя опора в мире глобализации.",
     type: "website",
     locale: "ru_RU",
   },
