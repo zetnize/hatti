@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { AdminPanel } from "@/components/admin-panel";
 import { adminCookieName, verifyAdminSession } from "@/lib/admin-auth";
-import { readProducts } from "@/lib/catalog";
+import { readCategories, readProducts } from "@/lib/catalog";
 import "./admin.css";
 
 export const dynamic = "force-dynamic";
@@ -14,5 +14,6 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   const authenticated = verifyAdminSession((await cookies()).get(adminCookieName)?.value);
-  return <AdminPanel key={authenticated ? "editor" : "login"} authenticated={authenticated} initialProducts={authenticated ? await readProducts() : []} />;
+  const [products, categories] = authenticated ? await Promise.all([readProducts(), readCategories()]) : [[], []];
+  return <AdminPanel key={authenticated ? "editor" : "login"} authenticated={authenticated} initialProducts={products} initialCategories={categories} />;
 }

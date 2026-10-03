@@ -4,27 +4,29 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, ArrowUpRight, Check, ImagePlus, LogOut, Plus, Save, Trash2 } from "lucide-react";
-import { categories, type Product, type ProductCategory } from "@/data/products";
+import { type Product } from "@/data/products";
 
 type Draft = {
   name: string;
-  category: ProductCategory;
+  category: string;
   color: string;
   image: string;
   code: string;
   description: string;
   options: string;
+  optionKind: "sizes" | "models";
 };
 
-const blankDraft: Draft = {
+const blankDraft = (category: string): Draft => ({
   name: "",
-  category: "Футболки",
+  category,
   color: "",
   image: "",
   code: "",
   description: "",
   options: "",
-};
+  optionKind: "sizes",
+});
 
 function draftFromProduct(product: Product): Draft {
   return {
@@ -35,16 +37,22 @@ function draftFromProduct(product: Product): Draft {
     code: product.code,
     description: product.description,
     options: (product.models ?? product.sizes ?? []).join(", "),
+    optionKind: product.models ? "models" : "sizes",
   };
 }
 
-export function AdminPanel({ authenticated, initialProducts }: { authenticated: boolean; initialProducts: Product[] }) {
+export function AdminPanel({ authenticated, initialProducts, initialCategories }: { authenticated: boolean; initialProducts: Product[]; initialCategories: string[] }) {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [products, setProducts] = useState(initialProducts);
+  const [categories, setCategories] = useState(initialCategories);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategories[0] ?? null);
+  const [categoryName, setCategoryName] = useState(initialCategories[0] ?? "");
+  const [categoryError, setCategoryError] = useState("");
+  const [categoryBusy, setCategoryBusy] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(initialProducts[0]?.id ?? null);
-  const [draft, setDraft] = useState<Draft>(initialProducts[0] ? draftFromProduct(initialProducts[0]) : blankDraft);
+  const [draft, setDraft] = useState<Draft>(initialProducts[0] ? draftFromProduct(initialProducts[0]) : blankDraft(initialCategories[0] ?? ""));
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -85,7 +93,7 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
 
   function newProduct() {
     setSelectedId(null);
-    setDraft(blankDraft);
+    setDraft(blankDraft(categories[0] ?? ""));
     setError("");
     setSaved(false);
   }
@@ -125,7 +133,7 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
       image: draft.image,
       code: draft.code,
       description: draft.description,
-      ...(draft.category === "Чехлы" ? { models: options } : { sizes: options }),
+      ...(draft.optionKind === "models" ? { models: options } : { sizes: options }),
     };
     try {
       const response = await fetch(selectedId === null ? "/api/admin/products" : `/api/admin/products/${selectedId}`, {
@@ -163,12 +171,76 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
       const next = remaining[0];
       setProducts(remaining);
       setSelectedId(next?.id ?? null);
-      setDraft(next ? draftFromProduct(next) : blankDraft);
+      setDraft(next ? draftFromProduct(next) : blankDraft(categories[0] ?? ""));
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось удалить товар.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function selectCategory(name: string) {
+    setSelectedCategory(name);
+    setCategoryName(name);
+    setCategoryError("");
+  }
+
+  async function saveCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCategoryBusy(true);
+    setCategoryError("");
+    const oldName = selectedCategory;
+    try {
+      const response = await fetch("/api/admin/categories", {
+        method: oldName === null ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(oldName === null ? { name: categoryName } : { oldName, name: categoryName }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось сохранить категорию.");
+      const nextName = categoryName.trim();
+      setCategories(result.categories);
+      setSelectedCategory(nextName);
+      setCategoryName(nextName);
+      if (oldName !== null && oldName !== nextName) {
+        setProducts((current) => current.map((product) => product.category === oldName ? { ...product, category: nextName } : product));
+        setDraft((current) => current.category === oldName ? { ...current, category: nextName } : current);
+      } else if (oldName === null && !draft.category) {
+        setDraft((current) => ({ ...current, category: nextName }));
+      }
+      router.refresh();
+    } catch (cause) {
+      setCategoryError(cause instanceof Error ? cause.message : "Не удалось сохранить категорию.");
+    } finally {
+      setCategoryBusy(false);
+    }
+  }
+
+  async function removeCategory() {
+    if (selectedCategory === null || categoryBusy) return;
+    const name = selectedCategory;
+    if (!window.confirm(`Удалить категорию «${name}»?`)) return;
+    setCategoryBusy(true);
+    setCategoryError("");
+    try {
+      const response = await fetch("/api/admin/categories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Не удалось удалить категорию.");
+      const next = result.categories[0] ?? null;
+      setCategories(result.categories);
+      setSelectedCategory(next);
+      setCategoryName(next ?? "");
+      setDraft((current) => current.category === name ? { ...current, category: next ?? "" } : current);
+      router.refresh();
+    } catch (cause) {
+      setCategoryError(cause instanceof Error ? cause.message : "Не удалось удалить категорию.");
+    } finally {
+      setCategoryBusy(false);
     }
   }
 
@@ -179,7 +251,7 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
         <section className="admin-login-card" aria-labelledby="admin-login-title">
           <span className="admin-eyebrow">PRIVATE / 01</span>
           <h1 id="admin-login-title">Вход в каталог</h1>
-          <p>Управление карточками товаров HATTI.</p>
+          <p>Управление товарами и категориями HATTI.</p>
           <form onSubmit={login}>
             <label>Логин<input name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></label>
             <label>Пароль<input name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
@@ -199,6 +271,21 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
         <div className="admin-top-actions"><a href="/" target="_blank" rel="noreferrer">Смотреть сайт <ArrowUpRight size={15} /></a><button onClick={logout}><LogOut size={15} /> Выйти</button></div>
       </header>
       <div className="admin-heading"><div><span className="admin-eyebrow">HATTI / BACK OFFICE</span><h1>Товары</h1></div><span className="admin-count">{products.length} объектов в каталоге</span></div>
+      <section className="admin-categories" aria-labelledby="admin-categories-title">
+        <div className="admin-categories-head"><div><span className="admin-eyebrow">СТРУКТУРА КАТАЛОГА</span><h2 id="admin-categories-title">Категории</h2></div><button type="button" onClick={() => { setSelectedCategory(null); setCategoryName(""); setCategoryError(""); }}><Plus size={16} /> Добавить категорию</button></div>
+        <div className="admin-categories-body">
+          <div className="admin-category-list" role="group" aria-label="Категории">
+            {categories.map((category) => <button key={category} type="button" className={selectedCategory === category ? "is-selected" : ""} onClick={() => selectCategory(category)}>{category}<span>{products.filter((product) => product.category === category).length}</span></button>)}
+          </div>
+          <form className="admin-category-form" onSubmit={saveCategory}>
+            <label htmlFor="admin-category-name">{selectedCategory === null ? "Новая категория" : "Название категории"}</label>
+            <div><input id="admin-category-name" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} maxLength={40} required /><button className="admin-primary-button" type="submit" disabled={categoryBusy}>{categoryBusy ? "Сохраняем…" : "Сохранить"}</button></div>
+            {selectedCategory !== null && <button className="admin-delete-button" type="button" disabled={categoryBusy || products.some((product) => product.category === selectedCategory)} onClick={removeCategory}><Trash2 size={15} /> Удалить категорию</button>}
+            {selectedCategory !== null && products.some((product) => product.category === selectedCategory) && <small>Для удаления сначала перенесите товары в другую категорию.</small>}
+            {categoryError && <p className="admin-error" role="alert">{categoryError}</p>}
+          </form>
+        </div>
+      </section>
       <div className="admin-columns">
         <aside className="admin-list" aria-label="Список товаров">
           <div className="admin-list-head"><span>КОЛЛЕКЦИЯ</span><button onClick={newProduct}><Plus size={16} /> Добавить</button></div>
@@ -221,11 +308,12 @@ export function AdminPanel({ authenticated, initialProducts }: { authenticated: 
             </div>
             <div className="admin-fields">
               <label className="admin-field-wide">Название<input value={draft.name} onChange={(event) => setField("name", event.target.value)} maxLength={100} required /></label>
-              <label>Категория<select value={draft.category} onChange={(event) => setField("category", event.target.value as ProductCategory)}>{categories.filter((category) => category !== "Все").map((category) => <option key={category}>{category}</option>)}</select></label>
+              <label>Категория<select value={draft.category} onChange={(event) => setField("category", event.target.value)} required>{categories.length === 0 && <option value="">Сначала добавьте категорию</option>}{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
               <label>Цвет<input value={draft.color} onChange={(event) => setField("color", event.target.value)} maxLength={60} required /></label>
               <label className="admin-field-wide">Код товара<input value={draft.code} onChange={(event) => setField("code", event.target.value)} maxLength={100} placeholder="OBJECT 21 / ..." required /></label>
               <label className="admin-field-wide">Описание<textarea value={draft.description} onChange={(event) => setField("description", event.target.value)} maxLength={1000} rows={4} required /></label>
-              <label className="admin-field-wide">{draft.category === "Чехлы" ? "Модели" : "Размеры или варианты"}<input value={draft.options} onChange={(event) => setField("options", event.target.value)} placeholder={draft.category === "Чехлы" ? "iPhone 15, iPhone 15 Pro" : "S, M, L, XL"} /><small>Разделяйте варианты запятыми. Можно оставить пустым.</small></label>
+              <label>Тип вариантов<select value={draft.optionKind} onChange={(event) => setField("optionKind", event.target.value as Draft["optionKind"])}><option value="sizes">Размеры / варианты</option><option value="models">Модели</option></select></label>
+              <label>Варианты<input value={draft.options} onChange={(event) => setField("options", event.target.value)} placeholder={draft.optionKind === "models" ? "iPhone 15, iPhone 15 Pro" : "S, M, L, XL"} /><small>Разделяйте значения запятыми. Можно оставить пустым.</small></label>
             </div>
             {error && <p className="admin-error" role="alert">{error}</p>}
             <div className="admin-form-actions">

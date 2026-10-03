@@ -1,4 +1,4 @@
-export type ProductCategory = "Футболки" | "Обложки" | "Чехлы" | "Кепки";
+export type ProductCategory = string;
 
 export type Product = {
   id: number;
@@ -13,7 +13,7 @@ export type Product = {
   models?: string[];
 };
 
-export const categories = ["Все", "Футболки", "Обложки", "Чехлы", "Кепки"] as const;
+export const initialCategories = ["Футболки", "Обложки", "Чехлы", "Кепки"];
 
 export const products: Product[] = [
   { id: 1, slug: "ticket-black", name: "Билет в Черкесию", category: "Футболки", color: "Чёрный", image: "/products/01_ticket_tshirt_black.png", code: "OBJECT 01 / 1864", description: "Графика дорожного билета как образ памяти, пути и возвращения.", sizes: ["S", "M", "L", "XL"] },

@@ -29,6 +29,24 @@
 .admin-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 48px clamp(20px, 3vw, 48px) 32px; }
 .admin-heading h1 { margin: 11px 0 0; font-size: clamp(4.5rem, 9vw, 8rem); }
 .admin-count { padding-bottom: 8px; }
+.admin-categories { margin: 0 clamp(20px, 3vw, 48px) 28px; border: 1px solid var(--line); background: var(--chalk); }
+.admin-categories-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--line); }
+.admin-categories-head h2 { margin: 5px 0 0; font-family: var(--display); font-size: 2.3rem; font-weight: 520; line-height: 1; text-transform: uppercase; }
+.admin-categories-head button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; font-size: 12px; font-weight: 700; }
+.admin-categories-head button:hover { color: var(--green); }
+.admin-categories-body { display: grid; grid-template-columns: minmax(210px, 1fr) minmax(260px, 1fr); gap: 24px; padding: 24px; }
+.admin-category-list { display: flex; align-content: start; flex-wrap: wrap; gap: 8px; }
+.admin-category-list button { display: inline-flex; align-items: center; gap: 12px; min-height: 38px; padding: 7px 11px; border: 1px solid var(--line); background: var(--paper); font-size: 12px; }
+.admin-category-list button.is-selected { border-color: var(--green); box-shadow: inset 2px 0 var(--green); }
+.admin-category-list button span { color: #686b65; font-family: var(--mono); font-size: 10px; }
+.admin-category-form { display: grid; align-content: start; gap: 9px; }
+.admin-category-form label { font-size: 12px; font-weight: 650; }
+.admin-category-form > div { display: flex; gap: 8px; }
+.admin-category-form input { min-width: 0; flex: 1; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(17, 19, 19, .3); background: var(--paper); }
+.admin-category-form .admin-primary-button { min-height: 46px; }
+.admin-category-form .admin-delete-button { justify-self: start; }
+.admin-category-form small { color: #686b65; }
+.admin-category-form .admin-error { margin-top: 5px; }
 .admin-columns { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 28px; padding: 0 clamp(20px, 3vw, 48px) 60px; }
 .admin-list, .admin-editor { border: 1px solid var(--line); background: var(--chalk); }
 .admin-list { min-height: 650px; }
@@ -64,4 +82,5 @@
 .admin-delete-button { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 9px 0; border: 0; background: none; color: #a03932; font-size: 12px; font-weight: 700; }
 .admin-delete-button:hover:not(:disabled) { color: #6d201b; text-decoration: underline; text-underline-offset: 4px; }
 @media (max-width: 860px) { .admin-columns { grid-template-columns: 1fr; }.admin-list { min-height: 0; }.admin-list-items { max-height: 270px; }.admin-draft-state { display: none; } }
-@media (max-width: 560px) { .admin-topbar { height: 64px; }.admin-brand > span, .admin-top-actions a { display: none; }.admin-heading { padding-top: 34px; }.admin-heading h1 { font-size: 5.5rem; }.admin-count { max-width: 90px; text-align: right; }.admin-editor-head, .admin-form { padding-left: 18px; padding-right: 18px; }.admin-image-field { grid-template-columns: 100px minmax(0, 1fr); gap: 15px; }.admin-preview { width: 100px; }.admin-image-field p { margin: 10px 0; }.admin-fields { grid-template-columns: 1fr; }.admin-field-wide { grid-column: 1; }.admin-login-card { padding: 30px 24px; } }
+@media (max-width: 700px) { .admin-categories-body { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .admin-topbar { height: 64px; }.admin-brand > span, .admin-top-actions a { display: none; }.admin-heading { padding-top: 34px; }.admin-heading h1 { font-size: 5.5rem; }.admin-count { max-width: 90px; text-align: right; }.admin-categories-head { padding: 18px; }.admin-categories-body { padding: 18px; }.admin-categories-head h2 { font-size: 1.9rem; }.admin-category-form > div { flex-wrap: wrap; }.admin-category-form input { flex-basis: 100%; }.admin-editor-head, .admin-form { padding-left: 18px; padding-right: 18px; }.admin-image-field { grid-template-columns: 100px minmax(0, 1fr); gap: 15px; }.admin-preview { width: 100px; }.admin-image-field p { margin: 10px 0; }.admin-fields { grid-template-columns: 1fr; }.admin-field-wide { grid-column: 1; }.admin-login-card { padding: 30px 24px; } }

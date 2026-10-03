@@ -21,9 +21,9 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { categories, type Product } from "@/data/products";
+import { type Product } from "@/data/products";
 
-type Filter = (typeof categories)[number];
+type Filter = string;
 type CartItem = { productId: number; size: string; quantity: number };
 type LegalKey = "terms" | "privacy" | "personal-data" | "cookies" | "delivery" | "details";
 
@@ -97,7 +97,7 @@ function getProductOptions(product: Product) {
   return product.sizes ?? product.models ?? [];
 }
 
-export function HattiStore({ products }: { products: Product[] }) {
+export function HattiStore({ products, categories }: { products: Product[]; categories: string[] }) {
   const [filter, setFilter] = useState<Filter>("Все");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
@@ -161,7 +161,7 @@ export function HattiStore({ products }: { products: Product[] }) {
 
   const filteredProducts = useMemo(
     () => (filter === "Все" ? products : products.filter((product) => product.category === filter)),
-    [filter],
+    [filter, products],
   );
 
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);

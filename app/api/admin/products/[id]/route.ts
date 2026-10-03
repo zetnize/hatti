@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requestIsAdmin, sameOrigin } from "@/lib/admin-auth";
-import { CatalogInputError, deleteProduct, parseProductInput, saveProduct } from "@/lib/catalog";
+import { CatalogInputError, deleteProduct, parseProductInput, readCategories, saveProduct } from "@/lib/catalog";
 
 export const runtime = "nodejs";
 
@@ -10,7 +10,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
   const id = Number((await context.params).id);
   if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: "Некорректный ID товара." }, { status: 400 });
   try {
-    const input = parseProductInput(await request.json());
+    const input = parseProductInput(await request.json(), await readCategories());
     const product = await saveProduct(id, input);
     return NextResponse.json({ product });
   } catch (error) {
