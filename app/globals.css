@@ -356,6 +356,7 @@ a:focus-visible {
 .footer-top { display: flex; align-items: center; justify-content: space-between; padding-bottom: clamp(70px, 10vw, 150px); }
 .footer-top .wordmark { font-size: clamp(5rem, 13vw, 13rem); }
 .footer-top a { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(241,239,232,.45); font-size: 12px; }
+.footer-socials { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
 .footer-legal { display: grid; grid-template-columns: minmax(180px, .65fr) 2fr; gap: 40px; padding: 24px 0 30px; border-top: 1px solid rgba(241,239,232,.25); }
 .footer-legal > span { font-family: var(--mono); font-size: 8px; text-transform: uppercase; letter-spacing: .07em; color: rgba(241,239,232,.56); }
 .footer-legal > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px; }
@@ -448,6 +449,7 @@ a:focus-visible {
 .copy-button, .cart-footer a { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; border: 1px solid var(--basalt); cursor: pointer; font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; }
 .copy-button { gap: 8px; margin-bottom: 7px; background: transparent; color: var(--basalt); }
 .cart-footer a { justify-content: space-between; padding: 0 16px; background: var(--basalt); color: var(--chalk); }
+.cart-footer a + a { margin-top: 7px; }
 
 @media (max-width: 1080px) {
   .hero { grid-template-columns: 1fr .8fr; }
