@@ -16,7 +16,9 @@ pnpm build
 pnpm exec next start --port 5000
 ```
 
-The current checkout flow collects selected products locally and opens a conversation with `@hatti_brand` on Instagram. Prices and inventory are intentionally marked as available on request until commerce data is supplied.
+The current checkout flow collects selected products locally and opens a conversation with `@hatti_brand` on Instagram. Product galleries, prices and the homepage order are managed in `/aloidimihdyrt`; inventory is confirmed on request. The site does not accept payments.
+
+See [catalog update instructions](docs/catalog-admin-update.md) for the database migration, file list, admin controls and verification steps.
 
 ## Product storage: Supabase PostgreSQL + Timeweb App Platform
 

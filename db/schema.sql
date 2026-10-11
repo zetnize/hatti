@@ -9,6 +9,14 @@ CREATE TABLE IF NOT EXISTS hatti_products (
   description text NOT NULL,
   sizes text[],
   models text[],
+  -- Nullable until migration 002 backfills existing covers and the current id order.
+  images jsonb,
+  sort_order integer,
+  price numeric(14,2) CHECK (price > 0),
+  old_price numeric(14,2) CHECK (old_price > 0),
+  currency text NOT NULL DEFAULT 'RUB' CHECK (currency IN ('RUB', 'USD', 'EUR', 'TRY')),
+  price_from boolean NOT NULL DEFAULT false,
+  show_price boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT hatti_products_options_check CHECK (sizes IS NULL OR models IS NULL)

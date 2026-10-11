@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requestIsAdmin, sameOrigin } from "@/lib/admin-auth";
 import { CatalogInputError, deleteProduct, parseProductInput, readCategories, saveProduct } from "@/lib/catalog";
 
@@ -12,6 +13,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
   try {
     const input = parseProductInput(await request.json(), await readCategories());
     const product = await saveProduct(id, input);
+    revalidatePath("/");
+    revalidatePath("/aloidimihdyrt");
     return NextResponse.json({ product });
   } catch (error) {
     return NextResponse.json({ error: error instanceof CatalogInputError ? error.message : "Не удалось сохранить товар." }, { status: error instanceof CatalogInputError ? 400 : 500 });
@@ -25,6 +28,8 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: "Некорректный ID товара." }, { status: 400 });
   try {
     await deleteProduct(id);
+    revalidatePath("/");
+    revalidatePath("/aloidimihdyrt");
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: error instanceof CatalogInputError ? error.message : "Не удалось удалить товар." }, { status: error instanceof CatalogInputError ? 400 : 500 });

@@ -352,6 +352,30 @@ a:focus-visible {
 .product-code, .product-category { font-size: 8px; color: rgba(17,19,19,.58); }
 .product-category { align-self: flex-end; writing-mode: vertical-rl; transform: rotate(180deg); }
 
+.product-carousel { position: relative; overflow: hidden; touch-action: pan-y; }
+.product-carousel:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.product-carousel-slide { position: absolute; inset: 0; }
+.product-carousel-open { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; color: inherit; }
+.product-carousel-open:hover .product-arrow { opacity: 1; transform: scale(1); }
+.product-carousel-open:hover img { transform: scale(1.035); }
+.product-image-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 100%; min-height: 56px; color: #666a63; font-size: 11px; text-align: center; }
+.carousel-arrow { position: absolute; top: 50%; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); background: var(--chalk); color: var(--basalt); transform: translateY(-50%); }
+.carousel-arrow--prev { left: 8px; }
+.carousel-arrow--next { right: 8px; }
+.carousel-arrow:hover { background: var(--basalt); color: var(--chalk); }
+.carousel-dots { position: absolute; bottom: 6px; left: 8px; right: 8px; z-index: 2; display: flex; justify-content: center; flex-wrap: wrap; }
+.carousel-dots button { display: grid; place-items: center; width: 24px; height: 32px; padding: 0; border: 0; background: transparent; }
+.carousel-dots button span { width: 7px; height: 7px; border: 1px solid var(--basalt); border-radius: 50%; background: var(--chalk); }
+.carousel-dots button[aria-pressed="true"] span { background: var(--basalt); }
+.product-info > span:first-child { min-width: 0; }
+.product-price { display: flex; flex-direction: column; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.product-price-current { font-size: clamp(14px, 1.25vw, 18px); font-weight: 750; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.product-price--request .product-price-current { color: #555950; font-size: 11px; font-weight: 550; }
+.product-price-history { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.product-price-history s { color: #666a63; }
+.product-discount { padding: 3px 5px; background: var(--green); color: var(--chalk); font-family: var(--mono); font-size: 10px; line-height: 1.3; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
 .footer { padding: 38px clamp(18px, 2.2vw, 40px) 22px; background: var(--basalt); color: var(--chalk); }
 .footer-top { display: flex; align-items: center; justify-content: space-between; padding-bottom: clamp(70px, 10vw, 150px); }
 .footer-top .wordmark { font-size: clamp(5rem, 13vw, 13rem); }

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import Lenis from "lenis";
 import {
   AnimatePresence,
@@ -22,6 +23,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type Product } from "@/data/products";
+import { ProductCarousel } from "@/components/product-carousel";
+import { ProductPrice } from "@/components/product-price";
 
 type Filter = string;
 type CartItem = { productId: number; size: string; quantity: number };
@@ -32,7 +35,7 @@ const legalDocuments: Record<LegalKey, { label: string; title: string; sections:
     label: "О каталоге",
     title: "Каталог и обращения",
     sections: [
-      { heading: "Статус", text: "HATTI пока показывает изделия и собирает обращения о них. Сайт не принимает оплату и не подтверждает заказы. Цены, наличие и условия будущих продаж здесь не опубликованы." },
+      { heading: "Статус", text: "HATTI пока показывает изделия и собирает обращения о них. Сайт не принимает оплату и не подтверждает заказы. Наличие и условия будущих продаж уточняются при обращении." },
       { heading: "Как связаться", text: "Можно сохранить список заинтересовавших изделий и написать HATTI в Instagram или Telegram. Такое сообщение является запросом информации об изделиях, а не оформлением покупки. Не отправляйте адрес доставки и платёжные данные." },
       { heading: "Перед началом продаж", text: "После оформления деятельности будут опубликованы данные продавца, цены, порядок оплаты, доставки и возврата. До этого сайт работает как каталог." },
     ],
@@ -98,6 +101,7 @@ function getProductOptions(product: Product) {
 }
 
 export function HattiStore({ products, categories }: { products: Product[]; categories: string[] }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<Filter>("Все");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
@@ -108,6 +112,14 @@ export function HattiStore({ products, categories }: { products: Product[]; cate
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartReady, setCartReady] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const refresh = () => router.refresh();
+    const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("hatti-catalog");
+    if (channel) channel.onmessage = refresh;
+    window.addEventListener("focus", refresh);
+    return () => { channel?.close(); window.removeEventListener("focus", refresh); };
+  }, [router]);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -342,15 +354,13 @@ export function HattiStore({ products, categories }: { products: Product[]; cate
                     exit={{ opacity: 0, y: 12 }}
                     transition={{ duration: 0.35 }}
                   >
+                    <ProductCarousel product={product} onOpen={() => openProduct(product)} />
                     <button className="product-open" onClick={() => openProduct(product)} aria-label={`Открыть ${product.name}`}>
-                      <span className="product-image">
-                        <Image src={product.image} alt={product.name} fill sizes="(max-width: 700px) 50vw, 28vw" />
-                        <span className="product-arrow"><ArrowUpRight size={19} /></span>
-                      </span>
                       <span className="product-info">
                         <span>
                           <span className="product-code">{product.code}</span>
                           <strong>{product.name}</strong>
+                          <ProductPrice product={product} />
                         </span>
                         <span className="product-category">{product.category}</span>
                       </span>
@@ -467,7 +477,7 @@ export function HattiStore({ products, categories }: { products: Product[]; cate
               onMouseDown={(event) => event.stopPropagation()}
             >
               <button className="quick-add-close" onClick={() => setQuickAddProduct(null)} aria-label="Закрыть выбор варианта"><X /></button>
-              <div className="quick-add-image"><Image src={quickAddProduct.image} alt="" fill sizes="180px" /></div>
+              <div className="quick-add-image">{quickAddProduct.image ? <Image src={quickAddProduct.image} alt="" fill sizes="180px" /> : <span className="product-image-placeholder">Нет изображения</span>}</div>
               <div className="quick-add-content">
                 <IndexLabel>{quickAddProduct.code}</IndexLabel>
                 <h2 id="quick-add-title">{quickAddProduct.name}</h2>
@@ -504,9 +514,7 @@ export function HattiStore({ products, categories }: { products: Product[]; cate
               onMouseDown={(event) => event.stopPropagation()}
             >
               <button className="modal-close" onClick={() => setSelectedProduct(null)} aria-label="Закрыть карточку"><X /></button>
-              <div className="modal-image">
-                <Image src={selectedProduct.image} alt={selectedProduct.name} fill sizes="(max-width: 800px) 100vw, 54vw" />
-              </div>
+              <ProductCarousel key={selectedProduct.id} product={selectedProduct} className="modal-image" sizes="(max-width: 800px) 100vw, 54vw" />
               <div className="modal-content">
                 <IndexLabel>{selectedProduct.code}</IndexLabel>
                 <h2 id="product-modal-title">{selectedProduct.name}</h2>
@@ -514,7 +522,7 @@ export function HattiStore({ products, categories }: { products: Product[]; cate
                 <dl>
                   <div><dt>Категория</dt><dd>{selectedProduct.category}</dd></div>
                   <div><dt>Цвет</dt><dd>{selectedProduct.color}</dd></div>
-                  <div><dt>Цена</dt><dd>По запросу</dd></div>
+                  {selectedProduct.show_price !== false && <div><dt>Цена</dt><dd><ProductPrice product={selectedProduct} /></dd></div>}
                 </dl>
                 {getProductOptions(selectedProduct).length > 0 && (
                   <fieldset className={`size-picker${selectedProduct.models ? " size-picker--models" : ""}`}>
@@ -557,7 +565,7 @@ export function HattiStore({ products, categories }: { products: Product[]; cate
                     if (!product) return null;
                     return (
                       <div className="cart-item" key={`${item.productId}-${item.size}`}>
-                        <div className="cart-item-image"><Image src={product.image} alt="" fill sizes="96px" /></div>
+                        <div className="cart-item-image">{product.image ? <Image src={product.image} alt="" fill sizes="96px" /> : <span className="product-image-placeholder">Нет изображения</span>}</div>
                         <div className="cart-item-info">
                           <span>{product.code}</span>
                           <strong>{product.name}</strong>

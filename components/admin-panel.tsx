@@ -3,14 +3,22 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Check, ImagePlus, LogOut, Plus, Save, Trash2 } from "lucide-react";
-import { type Product } from "@/data/products";
+import { ArrowLeft, ArrowUpRight, Check, LogOut, Plus, Save, Trash2 } from "lucide-react";
+import { type Product, type ProductImage } from "@/data/products";
+import { AdminGallery } from "@/components/admin-gallery";
+import { AdminProductOrder } from "@/components/admin-product-order";
+import { productImages } from "@/lib/product-display";
+import { parsePrice } from "@/lib/catalog-validation";
 
 type Draft = {
   name: string;
   category: string;
   color: string;
-  image: string;
+  images: ProductImage[];
+  price: string;
+  old_price: string;
+  price_from: boolean;
+  show_price: boolean;
   code: string;
   description: string;
   options: string;
@@ -21,7 +29,11 @@ const blankDraft = (category: string): Draft => ({
   name: "",
   category,
   color: "",
-  image: "",
+  images: [],
+  price: "",
+  old_price: "",
+  price_from: false,
+  show_price: true,
   code: "",
   description: "",
   options: "",
@@ -33,7 +45,11 @@ function draftFromProduct(product: Product): Draft {
     name: product.name,
     category: product.category,
     color: product.color,
-    image: product.image,
+    images: productImages(product),
+    price: product.price?.toString() ?? "",
+    old_price: product.old_price?.toString() ?? "",
+    price_from: product.price_from ?? false,
+    show_price: product.show_price ?? true,
     code: product.code,
     description: product.description,
     options: (product.models ?? product.sizes ?? []).join(", "),
@@ -55,8 +71,18 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
   const [draft, setDraft] = useState<Draft>(initialProducts[0] ? draftFromProduct(initialProducts[0]) : blankDraft(initialCategories[0] ?? ""));
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [orderBusy, setOrderBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+
+  function refreshCatalog() {
+    router.refresh();
+    if (typeof BroadcastChannel !== "undefined") {
+      const channel = new BroadcastChannel("hatti-catalog");
+      channel.postMessage("updated");
+      channel.close();
+    }
+  }
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -103,25 +129,17 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
     setSaved(false);
   }
 
-  async function uploadImage(file: File) {
-    setUploading(true);
-    setError("");
-    try {
-      const form = new FormData();
-      form.set("image", file);
-      const response = await fetch("/api/admin/upload", { method: "POST", body: form });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Не удалось загрузить изображение.");
-      setField("image", result.image);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Не удалось загрузить изображение.");
-    } finally {
-      setUploading(false);
-    }
-  }
-
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy || uploading || orderBusy) return;
+    let price: number | null;
+    let old_price: number | null;
+    try {
+      price = parsePrice(draft.price.trim().replace(",", "."), "Цена");
+      old_price = parsePrice(draft.old_price.trim().replace(",", "."), "Старая цена");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Проверьте цену."); return;
+    }
     setBusy(true);
     setError("");
     setSaved(false);
@@ -130,7 +148,13 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
       name: draft.name,
       category: draft.category,
       color: draft.color,
-      image: draft.image,
+      image: draft.images[0]?.src ?? "",
+      images: draft.images,
+      price,
+      old_price,
+      currency: "RUB",
+      price_from: draft.price_from,
+      show_price: draft.show_price,
       code: draft.code,
       description: draft.description,
       ...(draft.optionKind === "models" ? { models: options } : { sizes: options }),
@@ -148,7 +172,7 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
       setSelectedId(product.id);
       setDraft(draftFromProduct(product));
       setSaved(true);
-      router.refresh();
+      refreshCatalog();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось сохранить товар.");
     } finally {
@@ -172,7 +196,7 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
       setProducts(remaining);
       setSelectedId(next?.id ?? null);
       setDraft(next ? draftFromProduct(next) : blankDraft(categories[0] ?? ""));
-      router.refresh();
+      refreshCatalog();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось удалить товар.");
     } finally {
@@ -209,7 +233,7 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
       } else if (oldName === null && !draft.category) {
         setDraft((current) => ({ ...current, category: nextName }));
       }
-      router.refresh();
+      refreshCatalog();
     } catch (cause) {
       setCategoryError(cause instanceof Error ? cause.message : "Не удалось сохранить категорию.");
     } finally {
@@ -236,7 +260,7 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
       setSelectedCategory(next);
       setCategoryName(next ?? "");
       setDraft((current) => current.category === name ? { ...current, category: next ?? "" } : current);
-      router.refresh();
+      refreshCatalog();
     } catch (cause) {
       setCategoryError(cause instanceof Error ? cause.message : "Не удалось удалить категорию.");
     } finally {
@@ -268,32 +292,34 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
     <main className="admin-root admin-workspace">
       <header className="admin-topbar">
         <div className="admin-brand"><a href="/" className="admin-wordmark">HATTI</a><span>УПРАВЛЕНИЕ КАТАЛОГОМ</span></div>
-        <div className="admin-top-actions"><a href="/" target="_blank" rel="noreferrer">Смотреть сайт <ArrowUpRight size={15} /></a><button onClick={logout}><LogOut size={15} /> Выйти</button></div>
+        <div className="admin-top-actions"><a href="/" target="_blank" rel="noreferrer">Смотреть сайт <ArrowUpRight size={15} /></a><button disabled={busy || uploading || orderBusy} onClick={logout}><LogOut size={15} /> Выйти</button></div>
       </header>
       <div className="admin-heading"><div><span className="admin-eyebrow">HATTI / BACK OFFICE</span><h1>Товары</h1></div><span className="admin-count">{products.length} объектов в каталоге</span></div>
       <section className="admin-categories" aria-labelledby="admin-categories-title">
-        <div className="admin-categories-head"><div><span className="admin-eyebrow">СТРУКТУРА КАТАЛОГА</span><h2 id="admin-categories-title">Категории</h2></div><button type="button" onClick={() => { setSelectedCategory(null); setCategoryName(""); setCategoryError(""); }}><Plus size={16} /> Добавить категорию</button></div>
+        <div className="admin-categories-head"><div><span className="admin-eyebrow">СТРУКТУРА КАТАЛОГА</span><h2 id="admin-categories-title">Категории</h2></div><button type="button" disabled={categoryBusy || busy || uploading || orderBusy} onClick={() => { setSelectedCategory(null); setCategoryName(""); setCategoryError(""); }}><Plus size={16} /> Добавить категорию</button></div>
         <div className="admin-categories-body">
           <div className="admin-category-list" role="group" aria-label="Категории">
-            {categories.map((category) => <button key={category} type="button" className={selectedCategory === category ? "is-selected" : ""} onClick={() => selectCategory(category)}>{category}<span>{products.filter((product) => product.category === category).length}</span></button>)}
+            {categories.map((category) => <button key={category} type="button" disabled={categoryBusy || busy || uploading || orderBusy} className={selectedCategory === category ? "is-selected" : ""} onClick={() => selectCategory(category)}>{category}<span>{products.filter((product) => product.category === category).length}</span></button>)}
           </div>
           <form className="admin-category-form" onSubmit={saveCategory}>
             <label htmlFor="admin-category-name">{selectedCategory === null ? "Новая категория" : "Название категории"}</label>
-            <div><input id="admin-category-name" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} maxLength={40} required /><button className="admin-primary-button" type="submit" disabled={categoryBusy}>{categoryBusy ? "Сохраняем…" : "Сохранить"}</button></div>
-            {selectedCategory !== null && <button className="admin-delete-button" type="button" disabled={categoryBusy || products.some((product) => product.category === selectedCategory)} onClick={removeCategory}><Trash2 size={15} /> Удалить категорию</button>}
+            <div><input id="admin-category-name" disabled={categoryBusy || busy || uploading || orderBusy} value={categoryName} onChange={(event) => setCategoryName(event.target.value)} maxLength={40} required /><button className="admin-primary-button" type="submit" disabled={categoryBusy || busy || uploading || orderBusy}>{categoryBusy ? "Сохраняем…" : "Сохранить"}</button></div>
+            {selectedCategory !== null && <button className="admin-delete-button" type="button" disabled={categoryBusy || busy || uploading || orderBusy || products.some((product) => product.category === selectedCategory)} onClick={removeCategory}><Trash2 size={15} /> Удалить категорию</button>}
             {selectedCategory !== null && products.some((product) => product.category === selectedCategory) && <small>Для удаления сначала перенесите товары в другую категорию.</small>}
             {categoryError && <p className="admin-error" role="alert">{categoryError}</p>}
           </form>
         </div>
       </section>
+      <AdminProductOrder products={products} disabled={busy || uploading || orderBusy || categoryBusy} onBusy={setOrderBusy}
+        onSaved={(updated) => { setProducts(updated); refreshCatalog(); }} />
       <div className="admin-columns">
         <aside className="admin-list" aria-label="Список товаров">
-          <div className="admin-list-head"><span>КОЛЛЕКЦИЯ</span><button onClick={newProduct}><Plus size={16} /> Добавить</button></div>
+          <div className="admin-list-head"><span>КОЛЛЕКЦИЯ</span><button disabled={busy || uploading || orderBusy} onClick={newProduct}><Plus size={16} /> Добавить</button></div>
           <div className="admin-list-items">
             {products.length === 0 && <p className="admin-empty-list">Товаров пока нет. Добавьте первый объект.</p>}
             {products.map((product) => (
-              <button key={product.id} className={`admin-list-item${selectedId === product.id ? " is-selected" : ""}`} onClick={() => selectProduct(product)} aria-current={selectedId === product.id ? "true" : undefined}>
-                <span className="admin-list-thumb"><Image src={product.image} alt="" fill sizes="56px" /></span>
+              <button key={product.id} disabled={busy || uploading || orderBusy} className={`admin-list-item${selectedId === product.id ? " is-selected" : ""}`} onClick={() => selectProduct(product)} aria-current={selectedId === product.id ? "true" : undefined}>
+                <span className="admin-list-thumb">{product.image ? <Image src={product.image} alt="" fill sizes="56px" /> : <span>—</span>}</span>
                 <span><small>{product.code}</small><strong>{product.name}</strong><small>{product.category}</small></span>
               </button>
             ))}
@@ -302,23 +328,26 @@ export function AdminPanel({ authenticated, initialProducts, initialCategories }
         <section className="admin-editor" aria-labelledby="admin-editor-title">
           <div className="admin-editor-head"><div><span className="admin-eyebrow">{selectedId === null ? "НОВЫЙ ОБЪЕКТ" : `ОБЪЕКТ / ${String(selectedId).padStart(2, "0")}`}</span><h2 id="admin-editor-title">{selectedId === null ? "Новый товар" : "Редактирование"}</h2></div><span className="admin-draft-state">{saved ? <><Check size={15} /> Сохранено</> : "Изменения появятся на сайте после сохранения"}</span></div>
           <form onSubmit={save} className="admin-form">
-            <div className="admin-image-field">
-              <div className="admin-preview">{draft.image ? <Image src={draft.image} alt="Предпросмотр товара" fill sizes="(max-width: 800px) 100vw, 240px" /> : <ImagePlus size={34} strokeWidth={1.4} />}</div>
-              <div><label className="admin-upload-button">{uploading ? "Загружаем…" : "Загрузить изображение"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading || busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file); event.target.value = ""; }} /></label><p>PNG, JPEG или WebP до 8 МБ. Картинка сразу появится в предпросмотре.</p><label className="admin-path-label">Путь к изображению<input value={draft.image} onChange={(event) => setField("image", event.target.value)} placeholder="/products/image.png" required /></label></div>
-            </div>
-            <div className="admin-fields">
+            <AdminGallery images={draft.images} disabled={busy || uploading || orderBusy} uploading={uploading}
+              onChange={(images) => setField("images", images)} onUploading={setUploading} onError={setError} />
+            <fieldset className="admin-fields" disabled={busy || orderBusy}>
               <label className="admin-field-wide">Название<input value={draft.name} onChange={(event) => setField("name", event.target.value)} maxLength={100} required /></label>
               <label>Категория<select value={draft.category} onChange={(event) => setField("category", event.target.value)} required>{categories.length === 0 && <option value="">Сначала добавьте категорию</option>}{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
               <label>Цвет<input value={draft.color} onChange={(event) => setField("color", event.target.value)} maxLength={60} required /></label>
+              <label>Цена, ₽<input inputMode="decimal" value={draft.price} onChange={(event) => setField("price", event.target.value)} placeholder="12500" /><small>Положительное число; можно оставить пустым.</small></label>
+              <label>Старая цена, ₽<input inputMode="decimal" value={draft.old_price} onChange={(event) => setField("old_price", event.target.value)} placeholder="15000" /><small>Скидка появится, если старая цена больше текущей.</small></label>
+              <div className="admin-price-switches"><label><input type="checkbox" checked={draft.price_from} onChange={(event) => setField("price_from", event.target.checked)} />Префикс «от»</label>
+                <label><input type="checkbox" checked={draft.show_price} onChange={(event) => setField("show_price", event.target.checked)} />Показывать цену</label><small>Без значения — «Цена по запросу». Выключите показ, чтобы скрыть блок.</small></div>
               <label className="admin-field-wide">Код товара<input value={draft.code} onChange={(event) => setField("code", event.target.value)} maxLength={100} placeholder="OBJECT 21 / ..." required /></label>
               <label className="admin-field-wide">Описание<textarea value={draft.description} onChange={(event) => setField("description", event.target.value)} maxLength={1000} rows={4} required /></label>
               <label>Тип вариантов<select value={draft.optionKind} onChange={(event) => setField("optionKind", event.target.value as Draft["optionKind"])}><option value="sizes">Размеры / варианты</option><option value="models">Модели</option></select></label>
               <label>Варианты<input value={draft.options} onChange={(event) => setField("options", event.target.value)} placeholder={draft.optionKind === "models" ? "iPhone 15, iPhone 15 Pro" : "S, M, L, XL"} /><small>Разделяйте значения запятыми. Можно оставить пустым.</small></label>
-            </div>
+            </fieldset>
             {error && <p className="admin-error" role="alert">{error}</p>}
+            {saved && <p className="admin-success" role="status">Товар сохранён.</p>}
             <div className="admin-form-actions">
-              {selectedId !== null && <button className="admin-delete-button" type="button" disabled={busy || uploading} onClick={removeProduct}><Trash2 size={16} /> Удалить товар</button>}
-              <button className="admin-primary-button" type="submit" disabled={busy || uploading}><Save size={17} /> {busy ? "Сохраняем…" : "Сохранить товар"}</button>
+              {selectedId !== null && <button className="admin-delete-button" type="button" disabled={busy || uploading || orderBusy} onClick={removeProduct}><Trash2 size={16} /> Удалить товар</button>}
+              <button className="admin-primary-button" type="submit" disabled={busy || uploading || orderBusy}><Save size={17} /> {busy ? "Сохраняем…" : "Сохранить товар"}</button>
             </div>
           </form>
         </section>

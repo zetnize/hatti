@@ -1,4 +1,6 @@
 export type ProductCategory = string;
+export type ProductImage = { src: string; alt: string };
+export type Currency = "RUB";
 
 export type Product = {
   id: number;
@@ -7,6 +9,13 @@ export type Product = {
   category: ProductCategory;
   color: string;
   image: string;
+  images?: ProductImage[];
+  sort_order?: number;
+  price?: number | null;
+  old_price?: number | null;
+  currency?: Currency;
+  price_from?: boolean;
+  show_price?: boolean;
   code: string;
   description: string;
   sizes?: string[];

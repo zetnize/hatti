@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { Pool } from "pg";
 import { initialCategories, products as initialProducts, type Product } from "@/data/products";
 import { CatalogInputError } from "@/lib/catalog-errors";
+import type { ProductInput } from "@/lib/catalog";
+import { validateProductOrder } from "@/lib/catalog-order";
 
 type ProductRow = {
   id: number;
@@ -10,6 +14,13 @@ type ProductRow = {
   category: Product["category"];
   color: string;
   image: string;
+  images: NonNullable<Product["images"]>;
+  sort_order: number;
+  price: string | null;
+  old_price: string | null;
+  currency: Product["currency"];
+  price_from: boolean;
+  show_price: boolean;
   code: string;
   description: string;
   sizes: string[] | null;
@@ -98,6 +109,13 @@ function toProduct(row: ProductRow): Product {
     category: row.category,
     color: row.color,
     image: row.image,
+    images: row.images,
+    sort_order: row.sort_order,
+    price: row.price === null ? null : Number(row.price),
+    old_price: row.old_price === null ? null : Number(row.old_price),
+    currency: "RUB",
+    price_from: row.price_from,
+    show_price: row.show_price,
     code: row.code,
     description: row.description,
     ...(row.sizes?.length ? { sizes: row.sizes } : {}),
@@ -126,15 +144,22 @@ async function initializeSchema() {
           FOREIGN KEY (category) REFERENCES hatti_categories(name) ON UPDATE CASCADE ON DELETE RESTRICT;
       END IF;
     END $$`);
+    const migrated = await client.query("SELECT 1 FROM hatti_catalog_meta WHERE key = 'gallery_order_price_v2'");
+    if (!migrated.rowCount) {
+      const migration = await readFile(path.join(process.cwd(), "db", "migrations", "002_product_gallery_order_price.sql"), "utf8");
+      await client.query(migration.replace(/^BEGIN;\s*/, "").replace(/COMMIT;\s*$/, ""));
+      await client.query("INSERT INTO hatti_catalog_meta (key, value) VALUES ('gallery_order_price_v2', 'done')");
+    }
     const seeded = await client.query("SELECT 1 FROM hatti_catalog_meta WHERE key = 'initial_seed'");
     if (!seeded.rowCount) {
       const count = await client.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM hatti_products");
       if (count.rows[0].count === "0") {
         for (const product of initialProducts) {
           await client.query(
-            `INSERT INTO hatti_products (id, slug, name, category, color, image, code, description, sizes, models)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-            [product.id, product.slug, product.name, product.category, product.color, product.image, product.code, product.description, product.sizes ?? null, product.models ?? null],
+            `INSERT INTO hatti_products (id, slug, name, category, color, image, code, description, sizes, models, images, sort_order)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)`,
+            [product.id, product.slug, product.name, product.category, product.color, product.image, product.code, product.description, product.sizes ?? null, product.models ?? null,
+              JSON.stringify(product.images ?? [{ src: product.image, alt: product.name }]), product.id - 1],
           );
         }
         await client.query("SELECT setval(pg_get_serial_sequence('hatti_products', 'id'), (SELECT MAX(id) FROM hatti_products), true)");
@@ -161,7 +186,7 @@ export async function database() {
 
 export async function databaseProducts() {
   const result = await (await database()).query<ProductRow>(
-    "SELECT id, slug, name, category, color, image, code, description, sizes, models FROM hatti_products ORDER BY id",
+    "SELECT * FROM hatti_products ORDER BY sort_order, id",
   );
   return result.rows.map(toProduct);
 }
@@ -192,12 +217,17 @@ export async function databaseDeleteCategory(name: string) {
   if (!result.rowCount) throw new CatalogInputError("Категория не найдена или в ней есть товары. Сначала перенесите их в другую категорию.");
 }
 
-export async function databaseSaveProduct(id: number, input: Omit<Product, "id" | "slug">) {
+function productValues(input: ProductInput) {
+  return [input.name, input.category, input.color, input.image, input.code, input.description, input.sizes ?? null, input.models ?? null,
+    JSON.stringify(input.images ?? []), input.price ?? null, input.old_price ?? null, "RUB", input.price_from ?? false, input.show_price ?? true];
+}
+
+export async function databaseSaveProduct(id: number, input: ProductInput) {
   const result = await (await database()).query<ProductRow>(
     `UPDATE hatti_products SET name=$2, category=$3, color=$4, image=$5, code=$6, description=$7,
-      sizes=$8, models=$9, updated_at=now() WHERE id=$1
-     RETURNING id, slug, name, category, color, image, code, description, sizes, models`,
-    [id, input.name, input.category, input.color, input.image, input.code, input.description, input.sizes ?? null, input.models ?? null],
+      sizes=$8, models=$9, images=$10::jsonb, price=$11, old_price=$12, currency=$13, price_from=$14, show_price=$15,
+      updated_at=now() WHERE id=$1 RETURNING *`,
+    [id, ...productValues(input)],
   );
   if (!result.rows[0]) throw new CatalogInputError("Товар не найден.");
   return toProduct(result.rows[0]);
@@ -208,14 +238,41 @@ export async function databaseDeleteProduct(id: number) {
   if (!result.rowCount) throw new CatalogInputError("Товар не найден.");
 }
 
-export async function databaseCreateProduct(input: Omit<Product, "id" | "slug">) {
-  const result = await (await database()).query<ProductRow>(
-    `INSERT INTO hatti_products (slug, name, category, color, image, code, description, sizes, models)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, slug, name, category, color, image, code, description, sizes, models`,
-    [`product-${randomUUID()}`, input.name, input.category, input.color, input.image, input.code, input.description, input.sizes ?? null, input.models ?? null],
-  );
-  return toProduct(result.rows[0]);
+export async function databaseCreateProduct(input: ProductInput) {
+  const client = await (await database()).connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("LOCK TABLE hatti_products IN SHARE ROW EXCLUSIVE MODE");
+    const result = await client.query<ProductRow>(
+      `INSERT INTO hatti_products (slug, name, category, color, image, code, description, sizes, models, images, price, old_price, currency, price_from, show_price, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15,
+         (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM hatti_products)) RETURNING *`,
+      [`product-${randomUUID()}`, ...productValues(input)],
+    );
+    await client.query("COMMIT");
+    return toProduct(result.rows[0]);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
+}
+
+export async function databaseReorderProducts(value: unknown) {
+  const client = await (await database()).connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("LOCK TABLE hatti_products IN SHARE ROW EXCLUSIVE MODE");
+    const current = await client.query<{ id: number }>("SELECT id FROM hatti_products");
+    const ids = validateProductOrder(value, current.rows);
+    await client.query(`UPDATE hatti_products AS p SET sort_order = ordered.position - 1, updated_at = now()
+      FROM unnest($1::integer[]) WITH ORDINALITY AS ordered(id, position) WHERE p.id = ordered.id`, [ids]);
+    const result = await client.query<ProductRow>("SELECT * FROM hatti_products ORDER BY sort_order, id");
+    await client.query("COMMIT");
+    return result.rows.map(toProduct);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally { client.release(); }
 }
 
 export async function databaseSaveMedia(filename: string, contentType: string, bytes: Buffer) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requestIsAdmin, sameOrigin } from "@/lib/admin-auth";
 import { CatalogInputError, createProduct, parseProductInput, readCategories, readProducts } from "@/lib/catalog";
 
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
   try {
     const input = parseProductInput(await request.json(), await readCategories());
     const product = await createProduct(input);
+    revalidatePath("/");
+    revalidatePath("/aloidimihdyrt");
     return NextResponse.json({ product }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof CatalogInputError ? error.message : "Не удалось сохранить товар." }, { status: error instanceof CatalogInputError ? 400 : 500 });

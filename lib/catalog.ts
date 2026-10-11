@@ -2,14 +2,17 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { initialCategories, products as initialProducts, type Product } from "@/data/products";
-import { databaseCategories, databaseConfigured, databaseCreateCategory, databaseCreateProduct, databaseDeleteCategory, databaseDeleteProduct, databaseProducts, databaseRenameCategory, databaseSaveProduct } from "@/lib/database";
+import { databaseCategories, databaseConfigured, databaseCreateCategory, databaseCreateProduct, databaseDeleteCategory, databaseDeleteProduct, databaseProducts, databaseRenameCategory, databaseSaveProduct, databaseReorderProducts } from "@/lib/database";
 import { CatalogInputError } from "@/lib/catalog-errors";
+import { maxProductImages, normalizeProduct } from "@/lib/product-display";
+import { validateProductOrder } from "@/lib/catalog-order";
+import { parsePrice } from "@/lib/catalog-validation";
 
 const catalogDirectory = path.join(process.cwd(), ".data");
 const catalogFile = path.join(catalogDirectory, "products.json");
 const categoriesFile = path.join(catalogDirectory, "categories.json");
 
-export type ProductInput = Omit<Product, "id" | "slug">;
+export type ProductInput = Omit<Product, "id" | "slug" | "sort_order">;
 export { CatalogInputError } from "@/lib/catalog-errors";
 
 export async function readProducts(): Promise<Product[]> {
@@ -17,9 +20,9 @@ export async function readProducts(): Promise<Product[]> {
   if (process.env.NODE_ENV === "production") throw new Error("DATABASE_URL is required in production.");
   try {
     const stored = JSON.parse(await readFile(catalogFile, "utf8"));
-    return Array.isArray(stored) ? stored as Product[] : initialProducts;
+    return (Array.isArray(stored) ? stored as Product[] : initialProducts).map(normalizeProduct).sort((a, b) => a.sort_order! - b.sort_order! || a.id - b.id);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return initialProducts;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return initialProducts.map(normalizeProduct);
     throw error;
   }
 }
@@ -129,7 +132,7 @@ export async function createProduct(input: ProductInput) {
   let created!: Product;
   await changeProducts((products) => {
     const id = Math.max(0, ...products.map((product) => product.id)) + 1;
-    created = { ...input, id, slug: `product-${id}` };
+    created = { ...input, id, slug: `product-${id}`, sort_order: Math.max(-1, ...products.map((product) => product.sort_order ?? 0)) + 1 };
     return [...products, created];
   });
   return created;
@@ -142,6 +145,12 @@ export async function deleteProduct(id: number) {
     if (!products.some((product) => product.id === id)) throw new CatalogInputError("Товар не найден.");
     return products.filter((product) => product.id !== id);
   });
+}
+
+export async function reorderProducts(value: unknown) {
+  if (databaseConfigured()) return databaseReorderProducts(value);
+  if (process.env.NODE_ENV === "production") throw new Error("DATABASE_URL is required in production.");
+  return changeProducts((products) => validateProductOrder(value, products).map((id, sort_order) => ({ ...products.find((product) => product.id === id)!, sort_order })));
 }
 
 function requiredText(value: unknown, label: string, maxLength: number) {
@@ -164,9 +173,12 @@ export function parseProductInput(value: unknown, categories: string[]): Product
   const source = value as Record<string, unknown>;
   const category = requiredText(source.category, "Категория", 40);
   if (!categories.includes(category)) throw new CatalogInputError("Выберите категорию из списка.");
-  const image = requiredText(source.image, "Изображение", 250);
-  if (!/^\/(?:products\/[a-zA-Z0-9_-]+\.(?:png|jpe?g|webp)|api\/media\/[a-f0-9-]{36}\.(?:png|jpe?g|webp))$/.test(image)) {
-    throw new CatalogInputError("Используйте загруженное изображение или файл из каталога товаров.");
+  const images = parseImages(source.images ?? (source.image ? [{ src: source.image, alt: source.name }] : []));
+  const price = parsePrice(source.price, "Цена");
+  const old_price = parsePrice(source.old_price, "Старая цена");
+  if (source.currency !== undefined && source.currency !== "RUB") throw new CatalogInputError("Цены указываются только в рублях.");
+  for (const key of ["price_from", "show_price"]) {
+    if (source[key] !== undefined && typeof source[key] !== "boolean") throw new CatalogInputError("Проверьте переключатели цены.");
   }
   const sizes = options(source.sizes, "Размеры");
   const models = options(source.models, "Модели");
@@ -175,10 +187,31 @@ export function parseProductInput(value: unknown, categories: string[]): Product
     name: requiredText(source.name, "Название", 100),
     category,
     color: requiredText(source.color, "Цвет", 60),
-    image,
+    image: images[0]?.src ?? "",
+    images,
+    price,
+    old_price,
+    currency: "RUB",
+    price_from: source.price_from === true,
+    show_price: source.show_price !== false,
     code: requiredText(source.code, "Код", 100),
     description: requiredText(source.description, "Описание", 1000),
     ...(sizes?.length ? { sizes } : {}),
     ...(models?.length ? { models } : {}),
   };
+}
+
+function parseImages(value: unknown) {
+  if (!Array.isArray(value) || value.length > maxProductImages) throw new CatalogInputError("Можно добавить не более 10 изображений.");
+  const images = value.map((item: unknown) => {
+    if (!item || typeof item !== "object") throw new CatalogInputError("Некорректное изображение.");
+    const { src, alt } = item as Record<string, unknown>;
+    if (typeof src !== "string" || !/^\/(?:products\/[a-zA-Z0-9_-]+\.(?:png|jpe?g|webp)|api\/media\/[a-f0-9-]{36}\.(?:png|jpe?g|webp))$/.test(src)) {
+      throw new CatalogInputError("Используйте загруженное изображение или файл из каталога товаров.");
+    }
+    if (alt !== undefined && (typeof alt !== "string" || alt.length > 200)) throw new CatalogInputError("Описание изображения: не более 200 символов.");
+    return { src, alt: typeof alt === "string" ? alt.trim() : "" };
+  });
+  if (new Set(images.map((item) => item.src)).size !== images.length) throw new CatalogInputError("Изображения в галерее не должны повторяться.");
+  return images;
 }
