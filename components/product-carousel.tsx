@@ -6,6 +6,7 @@ import { ArrowUpRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react"
 import { useRef, useState } from "react";
 import type { Product } from "@/data/products";
 import { productImages } from "@/lib/product-display";
+import { productImageAlt } from "@/lib/product-image-alt";
 
 export function ProductCarousel({ product, onOpen, className = "product-image", sizes = "(max-width: 700px) 50vw, 28vw" }: {
   product: Product; onOpen?: () => void; className?: string; sizes?: string;
@@ -20,7 +21,7 @@ export function ProductCarousel({ product, onOpen, className = "product-image", 
   const image = images[currentIndex];
   const multiple = images.length > 1;
   const change = (next: number) => setIndex((next + images.length) % images.length);
-  const visual = image && failed !== image.src ? <Image src={image.src} alt={image.alt || `${product.name} — фото ${currentIndex + 1}`}
+  const visual = image && failed !== image.src ? <Image src={image.src} alt={productImageAlt(image, product.name, currentIndex)}
     fill sizes={sizes} loading="lazy" onError={() => setFailed(image.src)} draggable={false} />
     : <span className="product-image-placeholder"><ImageOff size={28} aria-hidden="true" /><span>Изображение недоступно</span></span>;
   const slides = <AnimatePresence initial={false}>
