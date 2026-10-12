@@ -1,7 +1,7 @@
 export const siteUrl = "https://hatti-brand.ru";
 export const siteTitle = "HATTI — черкесская одежда и аксессуары: каталог бренда";
 export const siteDescription =
-  "HATTI — этно-бренд черкесской одежды и аксессуаров. Футболки, кепки, обложки и чехлы. Выберите изделия и обратитесь к бренду в Instagram или Telegram.";
+  "HATTI (Хатти) — черкесская одежда и аксессуары в этно-стиле: футболки, кепки, обложки и чехлы. Каталог изделий и связь с брендом в Instagram и Telegram.";
 
 export const brandStructuredData = {
   "@context": "https://schema.org",
@@ -10,7 +10,7 @@ export const brandStructuredData = {
       "@type": "Organization",
       "@id": `${siteUrl}/#organization`,
       name: "HATTI",
-      alternateName: ["Хатти", "Хати"],
+      alternateName: ["Хатти", "Хати", "Hati"],
       description: "Бренд черкесской одежды и аксессуаров",
       url: `${siteUrl}/`,
       logo: `${siteUrl}/brand/hatti-icon-512.png`,
@@ -21,7 +21,7 @@ export const brandStructuredData = {
       "@type": "WebSite",
       "@id": `${siteUrl}/#website`,
       name: "HATTI — черкесская одежда и аксессуары",
-      alternateName: ["Хатти", "Хати"],
+      alternateName: ["Хатти", "Хати", "Hati"],
       url: `${siteUrl}/`,
       inLanguage: "ru",
       publisher: { "@id": `${siteUrl}/#organization` },
