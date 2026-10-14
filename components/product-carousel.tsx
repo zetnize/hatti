@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ArrowUpRight, ImageOff } from "lucide-react";
 import { useRef, useState } from "react";
 import type { Product } from "@/data/products";
 import { productImages } from "@/lib/product-display";
@@ -62,9 +62,9 @@ export function ProductCarousel({ product, onOpen, className = "product-image", 
     </button> : slides}
     {multiple && <>
       <button type="button" data-carousel-control className="carousel-arrow carousel-arrow--prev" aria-label="Предыдущее изображение"
-        onClick={(event) => { event.stopPropagation(); change(currentIndex - 1); }}><ChevronLeft size={18} /></button>
+        onClick={(event) => { event.stopPropagation(); change(currentIndex - 1); }}><span className="carousel-arrow-icon" aria-hidden="true" /></button>
       <button type="button" data-carousel-control className="carousel-arrow carousel-arrow--next" aria-label="Следующее изображение"
-        onClick={(event) => { event.stopPropagation(); change(currentIndex + 1); }}><ChevronRight size={18} /></button>
+        onClick={(event) => { event.stopPropagation(); change(currentIndex + 1); }}><span className="carousel-arrow-icon" aria-hidden="true" /></button>
       <div className="carousel-dots" role="group" aria-label="Выбор изображения">
         {images.map((item, position) => <button key={item.src} type="button" data-carousel-control
           aria-label={`Изображение ${position + 1} из ${images.length}`} aria-pressed={position === currentIndex}
